@@ -89,7 +89,14 @@
   .muted{color:#64748b; font-size:12px}
   .hidden{display:none !important}
 
-  #captureArea{position:relative}
+  /* 캡처 대상 */
+  #captureArea{
+    position:relative;
+    /* 결과 저장에 포함될 배경(흰색만 나오던 문제 해결) */
+    background: linear-gradient(135deg,var(--bg1),var(--bg2));
+    padding: 16px;
+    border-radius: 18px;
+  }
 </style>
 </head>
 <body>
@@ -139,18 +146,18 @@
     <section id="result" class="panel hidden">
       <div id="captureArea">
         <div class="result-head"><span class="badge">🏆 검사 완료</span></div>
-        <h2 class="title" style="margin:0 0 6px">당신만의 흥미 코드를 발견했어요!</h2>
-        <p class="sub">아래 이미지를 JPEG로 저장하여 가져갈 수 있어요.</p>
+        <h2 class="title" style="margin:0 0 6px; color:#fff">당신만의 흥미 코드를 발견했어요!</h2>
+        <p class="sub" style="color:#eef">아래 이미지를 JPEG로 저장하여 가져갈 수 있어요.</p>
 
         <!-- Top3 -->
-        <div class="card">
+        <div class="card" style="box-shadow:none">
           <h3 style="margin:0 0 8px">나의 흥미 코드 Top3</h3>
           <div id="top3" class="medals"></div>
         </div>
 
         <!-- 추천 진로 + 필요 역량 -->
         <div class="grid cols-2" style="margin-top:14px">
-          <div class="card">
+          <div class="card" style="box-shadow:none">
             <div style="display:flex; gap:10px; align-items:center">
               <img id="careerImg" alt="추천 진로 이미지"
                    style="width:60px;height:60px;border-radius:14px;object-fit:cover; background:#fff; border:1px solid #eef2f7" />
@@ -166,7 +173,7 @@
             <div id="jobList" class="jobs" style="margin-top:8px"></div>
           </div>
 
-          <div class="card">
+          <div class="card" style="box-shadow:none">
             <strong>⚡ 필요 역량</strong>
             <ul id="skillList" style="margin:10px 0 0 18px"></ul>
 
@@ -181,11 +188,11 @@
         </div>
 
         <!-- 전체 유형 점수 -->
-        <div class="card" style="margin-top:14px">
+        <div class="card" style="margin-top:14px; box-shadow:none">
           <h3 style="margin:0 0 10px">유형별 점수</h3>
           <div id="scoreBoard" class="grid"></div>
           <div class="spc"></div>
-          <div class="muted">이 분석은 설문을 바탕으로 한 참고 자료이며, 판단 시 다양한 요소를 함께 고려해 주세요.</div>
+          <div class="muted" style="color:#f1f5f9">이 분석은 설문을 바탕으로 한 참고 자료이며, 판단 시 다양한 요소를 함께 고려해 주세요.</div>
         </div>
       </div>
 
@@ -461,32 +468,30 @@ function waitImagesLoaded(rootEl){
   return Promise.all(promises);
 }
 
-/** JPEG 저장(화면 폭 고정 변경 없이, 출력 캔버스만 스케일링) */
+/** JPEG 저장(레이아웃 변경 없이, 출력 캔버스만 스케일링) */
 saveJpg.onclick = async ()=>{
   const target = document.getElementById('captureArea');
 
-  // iOS/Safari용: 사용자 클릭 시점에 새 창을 먼저 열어 팝업 차단 회피
-  const ua = navigator.userAgent; 
+  // iOS/Safari 팝업 차단 회피: 사용자 클릭 시점에 새 창을 먼저 열기
+  const ua = navigator.userAgent || '';
   const isIOS = /iPad|iPhone|iPod/.test(ua);
   const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
   const popupWin = (isIOS || isSafari) ? window.open('', '_blank') : null;
 
   saveJpg.disabled = true;
 
-  // 폰트/이미지 로드 보장
-  try{ await document.fonts.ready; }catch(e){}
+  try{ if (document.fonts && document.fonts.ready) await document.fonts.ready; }catch(e){}
   await waitImagesLoaded(target);
 
-  // 실제 캡처
   const baseCanvas = await html2canvas(target, {
-    backgroundColor:'#ffffff',
+    backgroundColor: null,     // 캡처에 #captureArea 배경(그라데이션) 포함
     scale: Math.min(2, window.devicePixelRatio || 2),
     useCORS:true
   });
 
-  // 출력 사이즈(1080px 너비 + 여백 32px) - 화면 레이아웃 변경 없음
+  // 출력 사이즈(1080px 기준 + 여백 24px) - 화면 레이아웃 변경 없음
   const targetWidth = 1080;
-  const margin = 32; // px
+  const margin = 24;
   const scale = targetWidth / baseCanvas.width;
   const drawW = Math.round(baseCanvas.width * scale);
   const drawH = Math.round(baseCanvas.height * scale);
@@ -494,9 +499,12 @@ saveJpg.onclick = async ()=>{
   const out = document.createElement('canvas');
   out.width  = drawW + margin*2;
   out.height = drawH + margin*2;
+
   const ctx = out.getContext('2d');
+  // 배경을 흰색이 아니라 투명으로 쓰고 싶다면 아래 두 줄 주석처리
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0,0,out.width,out.height);
+
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(baseCanvas, margin, margin, drawW, drawH);
@@ -511,7 +519,7 @@ saveJpg.onclick = async ()=>{
     img.src = dataURL; img.style.width = '100%'; img.style.height = 'auto';
     popupWin.document.body.appendChild(img);
   } else {
-    // 데스크톱/안드로이드 크롬 등 : 직접 다운로드
+    // 데스크톱/안드로이드 : 직접 다운로드
     const a = document.createElement('a');
     a.href = dataURL; a.download = 'career-result.jpg';
     document.body.appendChild(a); a.click(); a.remove();
